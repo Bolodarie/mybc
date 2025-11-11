@@ -217,17 +217,12 @@ int isHEX(FILE *tape)
 int lineno = 1;
 int colno = 1;
 
-// Skip spaces
+// Skip spaces (but not newlines, as they are used as command separators)
 void skipspaces(FILE *tape)
 {
 	int head;
-	while ( isspace(head = getc(tape)) ) {
-		if(head == '\n') {
-			lineno++; 
-			colno = 1;  
-		} else {
-			colno++;  
-		}
+	while ( isspace(head = getc(tape)) && head != '\n' ) {
+		colno++;
 	}
 	ungetc(head, tape);
 }
@@ -245,6 +240,14 @@ int gettoken(FILE *source)
 	if ( (token = isASGN(source)) ) return token;
 	lexeme[0] = token = getc(source);
 	lexeme[1] = 0;
+
+	// Update line count when newline is returned as a token
+	if (token == '\n') {
+		lineno++;
+		colno = 1;
+	} else {
+		colno++;
+	}
 
 	// return an ASCII token
 	return token;

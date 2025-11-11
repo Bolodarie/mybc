@@ -5,6 +5,9 @@
 #include <tokens.h>
 #include <parser.h>
 
+// Forward declaration
+const char* token_name(int token);
+
 int lookahead; // este é o olho do compilador
 
 // Interpretador de comando
@@ -18,6 +21,15 @@ void mybc(void) {
 		// cmdsep:
 		if(lookahead == ';' || lookahead == '\n') {
 			match(lookahead);
+		} else if (lookahead != EOF) {
+			// If not a separator and not EOF, there's an unexpected token
+			fprintf(stderr, "\nSyntax Error at line %d, column %d:\n", lineno, colno);
+			fprintf(stderr, "  Unexpected token: %s", token_name(lookahead));
+			if (lexeme[0] != '\0' && lookahead != '\n' && lookahead != EOF) {
+				fprintf(stderr, " ('%s')", lexeme);
+			}
+			fprintf(stderr, "\n  Expected: ; or newline\n");
+			exit(ERRTOKEN);
 		}
 		
 		cmd();
@@ -42,9 +54,23 @@ void cmd(void) {
 		case ID:
 			E();
 			printf("%lg\n", acc);
+			fflush(stdout);
+			break;
+		// epsilon production - allow empty command (e.g., blank line)
+		case ';':
+		case '\n':
+		case EOF:
+			// Valid empty command followed by separator or EOF
 			break;
 		default:
-			;
+			// Invalid token at start of command
+			fprintf(stderr, "\nSyntax Error at line %d, column %d:\n", lineno, colno);
+			fprintf(stderr, "  Invalid token: %s", token_name(lookahead));
+			if (lexeme[0] != '\0' && lookahead != '\n' && lookahead != EOF) {
+				fprintf(stderr, " ('%s')", lexeme);
+			}
+			fprintf(stderr, "\n  Expected: expression, 'exit', or 'quit'\n");
+			exit(ERRTOKEN);
 	}
 }
 // cmd  -> E | exit | quit | <epsilon> 
@@ -171,14 +197,53 @@ void E(void)
 }
 
 //////////////////////////// parser components /////////////////////////////////
+
+// Helper function to convert token to readable string
+const char* token_name(int token) {
+	switch(token) {
+		case ID: return "ID";
+		case DEC: return "DEC";
+		case OCT: return "OCT";
+		case HEX: return "HEX";
+		case FLT: return "FLT";
+		case ASGN: return ":=";
+		case EXIT: return "exit";
+		case QUIT: return "quit";
+		case EOF: return "EOF";
+		case '\n': return "newline";
+		case ';': return ";";
+		case '+': return "+";
+		case '-': return "-";
+		case '*': return "*";
+		case '/': return "/";
+		case '(': return "(";
+		case ')': return ")";
+		default:
+			if (token >= 32 && token <= 126) {
+				static char buf[4];
+				snprintf(buf, sizeof(buf), "'%c'", token);
+				return buf;
+			}
+			return "UNKNOWN";
+	}
+}
+
 int lookahead;
 void match(int expected)
 {
 	if (lookahead == expected) {
 		lookahead = gettoken(source);
 	} else {
+		fprintf(stderr, "\nSyntax Error at line %d, column %d:\n", lineno, colno);
+		fprintf(stderr, "  Expected: %s\n", token_name(expected));
+		fprintf(stderr, "  Found:    %s", token_name(lookahead));
 		
-		fprintf(stderr, "token mismatch at line %d, column %d\n", lineno, colno);
+		// Show lexeme if it exists and is meaningful
+		if (lexeme[0] != '\0' && lookahead != '\n' && lookahead != EOF) {
+			fprintf(stderr, " ('%s')", lexeme);
+		}
+		fprintf(stderr, "\n");
+		
 		exit(ERRTOKEN);
 	}
 }
