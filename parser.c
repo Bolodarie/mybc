@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <setjmp.h>
+#include <signal.h>
 #include <lexer.h>
 #include <tokens.h>
 #include <parser.h>
@@ -9,30 +11,56 @@
 const char* token_name(int token);
 
 int lookahead; // este é o olho do compilador
+jmp_buf error_recovery; // Ponto de retorno para recuperação de erros
+
+// Handler para Ctrl+C (SIGINT)
+void sigint_handler(int sig) {
+	(void)sig; // Evita warning de parâmetro não usado
+	printf("\n"); // Imprime quebra de linha
+	fflush(stdout);
+	longjmp(error_recovery, 1); // Volta para o loop principal
+}
 
 // Interpretador de comando
 //
 // mybc -> cmd ( cmdsep cmd ) EOF
 void mybc(void) {
-	cmd();
-
+	// Registra handler para Ctrl+C
+	signal(SIGINT, sigint_handler);
+	
+	// Loop principal: processa comandos até EOF
 	while(lookahead != EOF) {
+		// Marca ponto de recuperação de erro
+		if (setjmp(error_recovery) != 0) {
+			// RECUPERAÇÃO DE ERRO: chegou aqui via longjmp
+			// Descarta tokens até encontrar um separador válido
+			while(lookahead != '\n' && lookahead != ';' && lookahead != EOF) {
+				lookahead = gettoken(source);
+			}
+			// Consome o separador se houver
+			if (lookahead == '\n' || lookahead == ';') {
+				lookahead = gettoken(source);
+			}
+			// Volta ao início do loop para processar próximo comando
+			continue;
+		}
 		
-		// cmdsep:
+		// Processa um comando
+		cmd();
+		
+		// Após o comando, deve vir um separador (ou EOF)
 		if(lookahead == ';' || lookahead == '\n') {
 			match(lookahead);
 		} else if (lookahead != EOF) {
-			// If not a separator and not EOF, there's an unexpected token
+			// Token inesperado após comando
 			fprintf(stderr, "\nSyntax Error at line %d, column %d:\n", lineno, colno);
 			fprintf(stderr, "  Unexpected token: %s", token_name(lookahead));
 			if (lexeme[0] != '\0' && lookahead != '\n' && lookahead != EOF) {
 				fprintf(stderr, " ('%s')", lexeme);
 			}
 			fprintf(stderr, "\n  Expected: ; or newline\n");
-			exit(ERRTOKEN);
+			longjmp(error_recovery, 1);
 		}
-		
-		cmd();
 	}
 
 	match(EOF);
@@ -55,6 +83,7 @@ void cmd(void) {
 			E();
 			printf("%lg\n", acc);
 			fflush(stdout);
+			lineno++; // Incrementa linha pois o output cria uma nova linha visual
 			break;
 		// epsilon production - allow empty command (e.g., blank line)
 		case ';':
@@ -70,7 +99,7 @@ void cmd(void) {
 				fprintf(stderr, " ('%s')", lexeme);
 			}
 			fprintf(stderr, "\n  Expected: expression, 'exit', or 'quit'\n");
-			exit(ERRTOKEN);
+			longjmp(error_recovery, 1);
 	}
 }
 // cmd  -> E | exit | quit | <epsilon> 
@@ -244,6 +273,6 @@ void match(int expected)
 		}
 		fprintf(stderr, "\n");
 		
-		exit(ERRTOKEN);
+		longjmp(error_recovery, 1);
 	}
 }
