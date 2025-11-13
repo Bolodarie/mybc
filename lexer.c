@@ -220,11 +220,27 @@ int colno = 1;
 // Skip spaces (but not newlines, as they are used as command separators)
 void skipspaces(FILE *tape)
 {
-	int head;
-	while ( isspace(head = getc(tape)) && head != '\n' ) {
-		colno++;
+	int head, aux_head;
+	while(1){
+		head = getc(tape);
+		if ( isspace(head) && head != '\n' ) {
+			colno++;
+			continue;
+		}
+		if ( head == '\x1B' ) { // \x1B é o código ASCII para 'ESC'
+			if((aux_head = getc(tape)) == '['){
+				//getc(tape); // Consome o '['
+				getc(tape); // Consome o 'A', 'B', 'C' ou 'D'
+				continue; // Volta ao início do while para procurar mais lixo
+			}
+			else{
+				ungetc(aux_head,tape);
+				//continue;
+			}
+		}
+		ungetc(head, tape);
+		break;
 	}
-	ungetc(head, tape);
 }
 
 int gettoken(FILE *source)

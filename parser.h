@@ -22,5 +22,4 @@ extern void cmd(void);
 extern void E(void);
 extern void T(void);
 extern void F(void);
-extern void Q(void);
-extern void R(void);
+

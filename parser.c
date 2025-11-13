@@ -77,7 +77,7 @@ void mybc(void) {
 void cmd(void) {
 	switch (lookahead) {
 		case EXIT:
-		case QUIT:						
+		case QUIT:
 			exit(0);
 		// FIRST(E)
 		case '+':
@@ -110,7 +110,7 @@ void cmd(void) {
 			siglongjmp(error_recovery, 1);
 	}
 }
-// cmd  -> E | exit | quit | <epsilon> 
+// cmd  -> E | exit | quit | <epsilon>
 // cmdsep -> ';' | '\n'
 double acc;
 #define STACKSIZE 1024
