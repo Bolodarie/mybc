@@ -5,11 +5,16 @@
 #include <lexer.h>
 #include <tokens.h>
 
-char lexeme[MAXIDLEN + 1];
+char lexeme[MAXIDLEN + 1]; // Buffer global para armazenar o lexema do token lido
 
 /* Versão extendida de identificador Pascal
  * ID = [A-Za-z][A-Za-z0-9]*
  */
+// Reconhece um ID ([A-Za-z][A-Za-z0-9]*).
+//
+// Esta função também atua como a tabela de palavras-chave.
+// Se o 'lexeme' lido for "exit" ou "quit", retorna o token
+// correspondente em vez de ID.
 int isID(FILE *tape)
 {
 	if ( isalpha(lexeme[0] = getc(tape)) ) {
@@ -30,19 +35,22 @@ int isID(FILE *tape)
 	return 0;
 }
 
+// Tenta processar um número Decimal.
+// Trata o caso especial de "0" (que não é seguido por outros dígitos)
+// e números de "1-9" (que podem ser seguidos por outros).
 /*
  * DEC = [1-9][0-9]* | '0'
- *                           ------------------------------------------
- *                          |                      digit               |
- *                          |                    --------              |
- *                          |                   |        |             |
- *               digit      |     not zero      V        |  epsilon    V
+ * ------------------------------------------
+ * |                      digit               |
+ * |                    --------              |
+ * |                   |        |             |
+ * digit      |     not zero      V        |  epsilon    V
  * -->(is DEC)--------->(is ZERO)---------->(isdigit)-------------->((DEC))
- *       |
- *       | epsilon
- *       |
- *       V
- *     ((0))
+ * |
+ * | epsilon
+ * |
+ * V
+ * ((0))
  */
 int isDEC(FILE *tape)
 {
@@ -65,9 +73,15 @@ int isDEC(FILE *tape)
 // fpoint = DEC\.[0-9]* | \.[0-9][0-9]*
 // flt = fpoint EE? | DEC EE
 // EE = [eE]['+''-']?[0-9][0-9]*
-// test input: 3e+
-//             012
+// entrada de teste: 3e+
+//                   012
 
+// Tenta processar a parte de notação científica (ex: 'e+10', 'E-5').
+//
+// É chamada por 'isNUM' após um número ser lido.
+// 'hassign' controla o sinal opcional (+/-).
+// Se a sintaxe estiver errada (ex: "3e+"), faz 'ungetc'
+// dos caracteres lidos para que não sejam consumidos (backtracking).
 int isEE(FILE *tape)
 {
 	int i = strlen(lexeme);
@@ -75,7 +89,7 @@ int isEE(FILE *tape)
 	if ( toupper(lexeme[i] = getc(tape)) == 'E' ) {
 		i++;
 		
-		// check optional signal
+		// verifica sinal opcional
 		int hassign;
 		if ( (lexeme[i] = getc(tape)) == '+' || lexeme[i] == '-' ) {
 			hassign = i++;
@@ -84,7 +98,7 @@ int isEE(FILE *tape)
 			ungetc(lexeme[i], tape);
 		}
 		
-		// check required digit following
+		// verifica dígito obrigatório seguinte
 		if ( isdigit(lexeme[i] = getc(tape)) ) {
 			i++;
 			while( isdigit(lexeme[i] = getc(tape)) ) i++;
@@ -92,6 +106,7 @@ int isEE(FILE *tape)
 			lexeme[i] = 0;
 			return FLT;
 		}
+		// Backtracking: falhou em encontrar dígito após 'e' ou 'e+'
 		ungetc(lexeme[i], tape);
 		i--;
 		if (hassign) {
@@ -105,6 +120,14 @@ int isEE(FILE *tape)
 	return 0;
 }
 
+// Tenta processar qualquer formato numérico (DEC, FLT).
+//
+// Esta é uma função "orquestradora" que tenta, em ordem:
+// 1. Um decimal (isDEC).
+// 2. Se for decimal, tenta um ponto flutuante (ex: "123.").
+// 3. Se não for decimal, tenta um flutuante (ex: ".123").
+// 4. No final, tenta ler notação científica (isEE).
+// A ordem importa para tratar casos como ".5" vs "5.".
 int isNUM(FILE *tape)
 {
 	int token = isDEC(tape);
@@ -130,12 +153,12 @@ int isNUM(FILE *tape)
 				ungetc(lexeme[1], tape);
 				ungetc(lexeme[0], tape);
 				lexeme[0] = 0;
-				return 0; // not a number
+				return 0; // não é um número
 			}
 		} else {
 			ungetc(lexeme[0], tape);
 			lexeme[0] = 0;
-			return 0; // not a number
+			return 0; // não é um número
 		}
 	}
 	
@@ -146,6 +169,10 @@ int isNUM(FILE *tape)
 	return token;
 }
 
+// Tenta processar o token de atribuição ':='.
+//
+// Se ler um ':' mas o próximo não for '=', devolve ambos
+// os caracteres para o 'tape' (ungetc).
 int isASGN(FILE *tape){
 	lexeme[0] = getc(tape);
 	if(lexeme[0] == ':'){
@@ -159,6 +186,12 @@ int isASGN(FILE *tape){
 	ungetc(lexeme[0], tape);
 	return lexeme[0] = 0;
 }
+
+// Tenta processar um número Octal (prefixo '0', seguido de [0-7]).
+//
+// Se ler '0' mas o próximo não for [0-7], devolve os
+// caracteres para o 'tape' para ser lido como um DEC ("0")
+// pela função 'isNUM'.
 /*
  * OCT = '0'[0-7]+
  */
@@ -181,6 +214,11 @@ int isOCT(FILE *tape)
 	return 0;
 }
 
+// Tenta processar um número Hexadecimal (prefixo '0[xX]').
+//
+// Requer "0x" ou "0X" seguido de pelo menos um dígito hexadecimal.
+// Se a regra falhar (ex: "0x" sem nada), devolve tudo
+// para o 'tape' para ser lido como um DEC ("0") por 'isNUM'.
 /*
  * HEX = '0'[Xx][0-9A-Fa-f]+
  *
@@ -217,7 +255,10 @@ int isHEX(FILE *tape)
 int lineno = 1;
 int colno = 1;
 
-// Skip spaces (but not newlines, as they are used as command separators)
+// Consome espaços em branco, exceto '\n' (que é um token).
+//
+// Também ignora sequências de escape ANSI (ex: '\x1B[A' - seta para cima),
+// que são "lixo" comum em um REPL interativo.
 void skipspaces(FILE *tape)
 {
 	int head, aux_head;
@@ -243,28 +284,48 @@ void skipspaces(FILE *tape)
 	}
 }
 
+// Função principal do analisador léxico.
+//
+// 1. Pula espaços e lixo (skipspaces).
+// 2. Tenta reconhecer tokens na ordem de prioridade.
+//
+// A ORDEM DAS CHAMADAS É CRUCIAL:
+// - isID() vem antes de isNUM() pois "exit" é um ID, não um número.
+// - isHEX() e isOCT() vêm antes de isNUM() para que "0x10" ou "010"
+//   não sejam lidos como o decimal "0".
+//
+// Se nada for reconhecido, retorna o próprio caractere (ex: '+', '(', etc).
+// Também atualiza 'lineno' e 'colno' para o parser.
 int gettoken(FILE *source)
 {
 	int token;
 
 	skipspaces(source);
 
-	if ( (token = isID(source)) ) return token;
-	if ( (token = isHEX(source)) ) return token;
-	if ( (token = isOCT(source)) ) return token;
-	if ( (token = isNUM(source)) ) return token;
-	if ( (token = isASGN(source)) ) return token;
-	lexeme[0] = token = getc(source);
-	lexeme[1] = 0;
+	if ( (token = isID(source)) ) ;
+	else if ( (token = isHEX(source)) ) ;
+	else if ( (token = isOCT(source)) ) ;
+	else if ( (token = isNUM(source)) ) ;
+	else if ( (token = isASGN(source)) ) ;
+	else {
+		lexeme[0] = token = getc(source);
+		lexeme[1] = 0;
 
-	// Update line count when newline is returned as a token
-	if (token == '\n') {
-		lineno++;
-		colno = 1;
-	} else {
-		colno++;
+		// Update line count when newline is returned as a token
+		if (token == '\n') {
+			lineno++;
+			colno = 1;
+		} else {
+			colno++;
+		}
+		// return an ASCII token
+		return token;
 	}
+	// --- SUCESSO: Um token multi-caractere foi encontrado ---
+    // 6. Todos os 'if' acima (exceto o 'else') caem aqui
+    //    Atualiza 'colno' com base no comprimento do lexema lido
+    colno += (strlen(lexeme)-1); // <--- A MÁGICA!
 
-	// return an ASCII token
-	return token;
+    // 7. Retorna o token encontrado
+    return token;
 }

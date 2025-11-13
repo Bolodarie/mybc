@@ -7,7 +7,7 @@
 #include <lexer.h>
 #include <tokens.h>
 #include <parser.h>
-// Forward declaration
+// Declaração antecipada (forward declaration)
 const char* token_name(int token);
 
 int lookahead; // este é o olho do compilador
@@ -21,9 +21,13 @@ void sigint_handler(int sig) {
 	siglongjmp(error_recovery, 1); // Volta para o loop principal
 }
 
-// Interpretador de comando
+// Ponto de entrada e loop principal (REPL) do interpretador.
 //
-// mybc -> cmd ( cmdsep cmd ) EOF
+// 1. Configura o 'sigint_handler' para capturar Ctrl+C.
+// 2. Configura 'sigsetjmp' como ponto de recuperação de erro.
+// 3. Processa um 'cmd()' por vez.
+// 4. Em caso de erro (via 'siglongjmp'), descarta tokens até
+//    a próxima linha (';' ou '\n') e continua o loop.
 void mybc(void) {
 	// Registra handler para Ctrl+C
 	struct sigaction sa;
@@ -74,6 +78,14 @@ void mybc(void) {
 	match(EOF);
 }
 
+// Processa um único comando ou linha.
+//
+// Esta função decide o que fazer com base no primeiro token (lookahead):
+// - 'exit'/'quit': Encerra o programa.
+// - FIRST(E): Se for o início de uma expressão (número, ID, '+', etc.),
+//             chama E() para calcular e depois imprime o resultado.
+// - Epsilon (;, \n, EOF): Se for uma linha vazia, não faz nada.
+// - default: Se for um token inválido, dispara um erro.
 void cmd(void) {
 	switch (lookahead) {
 		case EXIT:
@@ -93,14 +105,14 @@ void cmd(void) {
 			fflush(stdout);
 			lineno++; // Incrementa linha pois o output cria uma nova linha visual
 			break;
-		// epsilon production - allow empty command (e.g., blank line)
+		// produção épsilon - permite comando vazio (ex: linha em branco)
 		case ';':
 		case '\n':
 		case EOF:
-			// Valid empty command followed by separator or EOF
+			// Comando vazio válido seguido por separador ou EOF
 			break;
 		default:
-			// Invalid token at start of command
+			// Token inválido no início do comando
 			fprintf(stderr, "\nSyntax Error at line %d, column %d:\n", lineno, colno);
 			fprintf(stderr, "  Invalid token: %s", token_name(lookahead));
 			if (lexeme[0] != '\0' && lookahead != '\n' && lookahead != EOF) {
@@ -124,6 +136,11 @@ int symtab_next_entry = 0; // uso: strcpy(symtab[symtab_next_entry], name);
 double vmem[MAXSTENTRIES];
 
 int address;
+// Busca ou cria uma variável na tabela de símbolos.
+//
+// Procura o 'name' de trás para frente (do mais recente para o mais antigo).
+// - Se achar, retorna o valor de 'vmem[address]'.
+// - Se não achar, cria uma nova entrada no fim da tabela com valor 0.0.
 double recall(char const *name){
 	for(address = symtab_next_entry -1; address > -1; address--){
 			if(strcmp(symtab[address], name) == 0){
@@ -135,20 +152,29 @@ double recall(char const *name){
 	return 0.0e0;
 }
 
+// Armazena o valor do acumulador 'acc' em uma variável.
+//
+// Usa 'recall(name)' para encontrar o endereço da variável (ou criar um)
+// e então salva o valor de 'acc' nesse endereço em 'vmem'.
 void store(char const *name){
 	recall(name); //vai localizar o endereço da variavel na memoria;
 	vmem[address] = acc;
 }
 
-// E é o símbolo inicial da gramática LL(1) de expressões simplificadas
-// ominus = ['+', '-']
-// oplus = ['+', '-']
+// Processa uma expressão (Fator -> Termo -> Expressão)
+//
+// Esta função NÃO é recursiva. Ela usa 'goto' e uma pilha
+// para implementar a precedência de operadores de forma iterativa.
+//
+// 1. Trata Fatores (números, '()', IDs) e laço _Fbegin para ( *, / )
+// 2. Trata Termos e laço _Tbegin para ( +, - )
+// 3. 'acc' (acumulador) guarda o resultado final ou intermediário.
 void E(void)
 {
-	/**/char varname[MAXIDLEN+1];/**/
-	/**/int isnegate = 0;/**/
-	/**/int isotimes = 0;/**/
-	/**/int isoplus = 0;/**/
+	char varname[MAXIDLEN+1];
+	int isnegate = 0;
+	int isotimes = 0;
+	int isoplus = 0;
 
 	if(lookahead == '+' || lookahead == '-') {
 		if (lookahead == '-') {
@@ -166,28 +192,25 @@ void E(void)
 			match('('); E(); match(')');
 			break;
 		case DEC:
-			// /**/fprintf(objcode, " %s ", lexeme);/**/
 			acc = atoi(lexeme);
 			match(DEC); break;
 		case FLT:
-			// /**/fprintf(objcode, " %s ", lexeme);/**/
 			acc = atof(lexeme);
 			match(FLT); break;
 		default:
-			// /**/fprintf(objcode, " %s ", lexeme);/**/
 			// F -> ID [ := E]
-			/**/ strcpy(varname, lexeme); /**/
+			strcpy(varname, lexeme);
 			match(ID);
 			if(lookahead == ASGN){
 				match(ASGN);
 				E(); // tras o resultado no acumulador (acc)
-				/**/store(varname);/**/ // armazena no endereco associado a (varname)
+				store(varname); // armazena no endereco associado a (varname)
 			}else{
-				/**/acc = recall(varname);/**/
+				acc = recall(varname);
 			}
 	}
-	// factor end
-	/**/
+	// fim do fator
+	
 	if(isotimes) {
 		if (isotimes == '*') {
 			stack[sp] = stack[sp] * acc;
@@ -197,22 +220,22 @@ void E(void)
 		acc = stack[sp--];
 		isotimes = 0;
 	}
-	/**/
+	
 
 	if(lookahead == '*' || lookahead == '/') {
-		/**/isotimes = lookahead;/**/
+		isotimes = lookahead;
 		stack[++sp] = acc;
 		match(lookahead); goto _Fbegin;
 	}
-    // term end
-    /**/
+    // fim do termo
+    
     if (isnegate) {
 		acc = -acc;
 		isnegate = 0;
 	}
-	/**/
+	
 
-	/**/
+	
 	if(isoplus) {
 		if (isoplus == '+') {
 			stack[sp] = stack[sp] + acc;
@@ -222,20 +245,20 @@ void E(void)
 		acc = stack[sp--];
 		isoplus = 0;
 	}
-	/**/
+	
 
 	if(lookahead == '+' || lookahead == '-') {
 		isoplus = lookahead;
 		stack[++sp] = acc;
 		match(lookahead); goto _Tbegin;
 	}
-	// expression end
+	// fim da expressão
 
 }
 
 //////////////////////////// parser components /////////////////////////////////
 
-// Helper function to convert token to readable string
+// Função auxiliar para converter token em string legível
 const char* token_name(int token) {
 	switch(token) {
 		case ID: return "ID";
@@ -266,6 +289,11 @@ const char* token_name(int token) {
 }
 
 int lookahead;
+// Consome o token esperado ou dispara um erro.
+//
+// Se 'lookahead' for o 'expected', avança para o próximo token.
+// Se não for, imprime o erro e usa 'siglongjmp' para
+// pular de volta para o loop principal (recuperação de erro).
 void match(int expected)
 {
 	if (lookahead == expected) {
@@ -275,7 +303,7 @@ void match(int expected)
 		fprintf(stderr, "  Expected: %s\n", token_name(expected));
 		fprintf(stderr, "  Found:    %s", token_name(lookahead));
 		
-		// Show lexeme if it exists and is meaningful
+		// Mostra o lexema se ele existir e for significativo
 		if (lexeme[0] != '\0' && lookahead != '\n' && lookahead != EOF) {
 			fprintf(stderr, " ('%s')", lexeme);
 		}
