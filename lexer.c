@@ -257,8 +257,7 @@ int colno = 1;
 
 // Consome espaços em branco, exceto '\n' (que é um token).
 //
-// Também ignora sequências de escape ANSI (ex: '\x1B[A' - seta para cima),
-// que são "lixo" comum em um REPL interativo.
+// Também ignora sequências de escape ANSI (ex: '\x1B[A' - seta para cima)
 void skipspaces(FILE *tape)
 {
 	int head, aux_head;
@@ -272,11 +271,10 @@ void skipspaces(FILE *tape)
 			if((aux_head = getc(tape)) == '['){
 				//getc(tape); // Consome o '['
 				getc(tape); // Consome o 'A', 'B', 'C' ou 'D'
-				continue; // Volta ao início do while para procurar mais lixo
+				continue; // Volta ao início do while
 			}
 			else{
 				ungetc(aux_head,tape);
-				//continue;
 			}
 		}
 		ungetc(head, tape);
@@ -311,21 +309,15 @@ int gettoken(FILE *source)
 		lexeme[0] = token = getc(source);
 		lexeme[1] = 0;
 
-		// Update line count when newline is returned as a token
+		// Atualiza caso de '\n'
 		if (token == '\n') {
 			lineno++;
 			colno = 1;
 		} else {
 			colno++;
 		}
-		// return an ASCII token
 		return token;
 	}
-	// --- SUCESSO: Um token multi-caractere foi encontrado ---
-    // 6. Todos os 'if' acima (exceto o 'else') caem aqui
-    //    Atualiza 'colno' com base no comprimento do lexema lido
-    colno += (strlen(lexeme)-1); // <--- A MÁGICA!
-
-    // 7. Retorna o token encontrado
+    colno += (strlen(lexeme)-1);
     return token;
 }
