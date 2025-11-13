@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,7 +7,6 @@
 #include <lexer.h>
 #include <tokens.h>
 #include <parser.h>
-
 // Forward declaration
 const char* token_name(int token);
 
@@ -18,7 +18,7 @@ void sigint_handler(int sig) {
 	(void)sig; // Evita warning de parâmetro não usado
 	printf("\n"); // Imprime quebra de linha
 	fflush(stdout);
-	longjmp(error_recovery, 1); // Volta para o loop principal
+	siglongjmp(error_recovery, 1); // Volta para o loop principal
 }
 
 // Interpretador de comando
@@ -26,12 +26,20 @@ void sigint_handler(int sig) {
 // mybc -> cmd ( cmdsep cmd ) EOF
 void mybc(void) {
 	// Registra handler para Ctrl+C
-	signal(SIGINT, sigint_handler);
+	struct sigaction sa;
+	sa.sa_handler = sigint_handler; // Nossa função de tratamento
+	sigemptyset(&sa.sa_mask);       // Não bloquear outros sinais durante a execução
+	sa.sa_flags = 0;                // Nenhuma flag especial
 	
+	// Aplica a configuração para o sinal SIGINT (Ctrl+C)
+	if (sigaction(SIGINT, &sa, NULL) == -1) {
+		perror("Erro ao configurar sigaction"); // Boa prática
+		exit(1);
+	}
 	// Loop principal: processa comandos até EOF
 	while(lookahead != EOF) {
 		// Marca ponto de recuperação de erro
-		if (setjmp(error_recovery) != 0) {
+		if (sigsetjmp(error_recovery, 1) != 0) {
 			// RECUPERAÇÃO DE ERRO: chegou aqui via longjmp
 			// Descarta tokens até encontrar um separador válido
 			while(lookahead != '\n' && lookahead != ';' && lookahead != EOF) {
@@ -59,7 +67,7 @@ void mybc(void) {
 				fprintf(stderr, " ('%s')", lexeme);
 			}
 			fprintf(stderr, "\n  Expected: ; or newline\n");
-			longjmp(error_recovery, 1);
+			siglongjmp(error_recovery, 1);
 		}
 	}
 
@@ -99,7 +107,7 @@ void cmd(void) {
 				fprintf(stderr, " ('%s')", lexeme);
 			}
 			fprintf(stderr, "\n  Expected: expression, 'exit', or 'quit'\n");
-			longjmp(error_recovery, 1);
+			siglongjmp(error_recovery, 1);
 	}
 }
 // cmd  -> E | exit | quit | <epsilon> 
@@ -273,6 +281,6 @@ void match(int expected)
 		}
 		fprintf(stderr, "\n");
 		
-		longjmp(error_recovery, 1);
+		siglongjmp(error_recovery, 1);
 	}
 }
