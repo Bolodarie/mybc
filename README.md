@@ -101,12 +101,6 @@ F     → (E) | NUM | ID [:= E]
    - Verifica se token atual é o esperado
    - Avança para próximo token ou dispara erro
 
-**Estruturas de Dados:**
-- `double acc` - Acumulador (resultado intermediário)
-- `double stack[1024]` - Pilha para operações
-- `double vmem[4096]` - Memória virtual para variáveis
-- `char symtab[4096][MAXIDLEN+1]` - Tabela de símbolos
-
 ### 3. Sistema de Recuperação de Erros
 
 **Mecanismo: `setjmp`/`longjmp`**
@@ -133,6 +127,7 @@ if (sigsetjmp(error_recovery, 1) != 0) {
 - ✅ Erros de sintaxe (token inesperado)
 - ✅ Divisão por zero (erro de runtime)
 - ✅ Ctrl+C (interrupção de usuário)
+- ✅ Filtro das teclas <- e ->
 
 ---
 
@@ -183,11 +178,6 @@ $
 ### Validação Automatizada (32 testes)
 ```bash
 ./test_auto.sh
-```
-
-### Suite Completa de Demonstração
-```bash
-./test_all.sh
 ```
 
 Ver documentação completa em **[TESTES.md](TESTES.md)**
@@ -251,13 +241,6 @@ mybc/
 ├── TESTES.md             # Documentação de testes
 └── README.md             # Este arquivo
 ```
-
----
-
-## 📚 Documentação
-
-- **[TESTES.md](TESTES.md)** - Guia completo de testes
-- **[CTRL_C_EXPLAINED.md](CTRL_C_EXPLAINED.md)** - Explicação do tratamento de Ctrl+C
 
 ---
 
