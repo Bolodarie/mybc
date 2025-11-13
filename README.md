@@ -8,10 +8,28 @@ Interpretador interativo (REPL) de expressões aritméticas em C, desenvolvido c
 
 ### 1. Fluxo de Execução Principal
 
-```
-[main.c] → [lexer.c] → [parser.c] → [output]
-    ↓          ↓           ↓
-  stdin   Tokenização   Avaliação
+```mermaid
+graph TD
+    subgraph "Fluxo Principal"
+        Start((Início)) --> Main["main(): Chama mybc()"]
+        Main --> Setjmp["mybc(): Salva Ponto de Retorno (sigsetjmp)"]
+        Setjmp --> CallCmd["mybc(): Chama cmd() para processar a linha"]
+        
+        CallCmd --> CmdSwitch{"cmd(): Que tipo de comando é?"}
+        
+        CmdSwitch -- "exit ou quit" --> End((Fim))
+        
+        CmdSwitch -- "Expressão (ex: 10+5)" --> Eval["Chama E() para calcular"]
+        Eval --> Print["Imprime resultado (acc)"]
+        Print --> Setjmp
+        
+        CmdSwitch -- "Linha Vazia" --> Setjmp
+    end
+
+    subgraph "Fluxo de Erro"
+        ErrorPoint["Qualquer Erro de Sintaxe\nOU\nUsuário pressiona Ctrl+C"] --> Longjmp["GATILHO: siglongjmp()"]
+        Longjmp --> Setjmp
+    end
 ```
 
 **Ciclo REPL:**
