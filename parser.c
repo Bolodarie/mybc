@@ -175,6 +175,7 @@ void E(void)
 	int isnegate = 0;
 	int isotimes = 0;
 	int isoplus = 0;
+	int expr_lineno = lineno; // Salva linha onde a expressão começou
 
 	if(lookahead == '+' || lookahead == '-') {
 		if (lookahead == '-') {
@@ -215,6 +216,12 @@ void E(void)
 		if (isotimes == '*') {
 			stack[sp] = stack[sp] * acc;
 		} else {
+			// Verifica divisão por zero
+			if (acc == 0.0) {
+				fprintf(stderr, "\nRuntime Error at line %d, column %d:\n", expr_lineno, colno);
+				fprintf(stderr, "  Division by zero\n");
+				siglongjmp(error_recovery, 1);
+			}
 			stack[sp] = stack[sp] / acc;		
 		}
 		acc = stack[sp--];
