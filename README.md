@@ -248,6 +248,7 @@ mybc/
 
 **32/32 testes automatizados passando** ✅
 
+
 ```bash
 $ ./test_auto.sh
 🎉 TODOS OS TESTES PASSARAM!
