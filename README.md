@@ -176,9 +176,14 @@ $
 ## 🧪 Testes
 
 ### Validação Automatizada (32 testes)
+
+
 ```bash
-./test_auto.sh
+$ ./test_auto.sh
+🎉 TODOS OS TESTES PASSARAM!
 ```
+
+![alt text](image.png)
 
 Ver documentação completa em **[TESTES.md](TESTES.md)**
 
@@ -240,16 +245,4 @@ mybc/
 ├── test_checklist.sh     # Checklist manual
 ├── TESTES.md             # Documentação de testes
 └── README.md             # Este arquivo
-```
-
----
-
-## ✅ Status
-
-**32/32 testes automatizados passando** ✅
-
-
-```bash
-$ ./test_auto.sh
-🎉 TODOS OS TESTES PASSARAM!
 ```
