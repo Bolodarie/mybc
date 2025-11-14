@@ -137,11 +137,14 @@ if (sigsetjmp(error_recovery, 1) != 0) {
 - ✅ **Parênteses** e precedência de operadores
 - ✅ **Números:** inteiros, decimais, hexadecimais (0x), octais (0)
 - ✅ **Variáveis:** atribuição com `:=`
+
+### Diferenciais
+
 - ✅ **Divisão por zero:** detectada e reportada
 - ✅ **Recuperação de erros:** interpretador continua após erros
 - ✅ **Mensagens detalhadas:** linha, coluna e tipo de erro
 - ✅ **Captura de Ctrl+C:** não encerra o interpretador
-- ✅ **REPL completo:** Read-Eval-Print-Loop interativo
+- ✅ **Filtro das setas** ignorar as setas esquerda e direita
 
 ---
 
