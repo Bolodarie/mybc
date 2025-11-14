@@ -2,14 +2,13 @@
 #include <stdlib.h>
 #include <main.h>
 
-FILE *source, *objcode;
+FILE *source;
 
 extern double acc;
 extern void mybc(void);
 int main(void)
 {
 	lookahead = gettoken(source = stdin);
-	objcode = stdout;
 
 	mybc();
 

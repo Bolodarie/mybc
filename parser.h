@@ -10,7 +10,6 @@ extern char lexeme[];
 extern int lineno;
 extern int colno;
 
-extern FILE* objcode;
 extern FILE *source;
 
 extern void match(int);
